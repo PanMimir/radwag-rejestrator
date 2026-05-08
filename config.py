@@ -74,9 +74,7 @@ SCAN_TIMEOUT_S = 1.0   # krótszy timeout dla skanu, żeby nie czekać wiecznie 
 # ZAPIS DANYCH
 # =====================================================================
 
-CSV_DEFAULT_FILENAME = "log_wagi.csv"
-CSV_SEPARATOR = ";"     # średnik — Excel w polskiej lokalizacji od razu rozpoznaje kolumny
-CSV_ENCODING = "utf-8-sig"  # BOM, żeby Excel pokazał polskie znaki bez kombinowania
+EXCEL_DEFAULT_FILENAME = "log_wagi.xlsx"
 
 # Format znacznika czasu zapisywanego w CSV i pokazywanego w GUI.
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"

@@ -26,16 +26,16 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget, QLabel, QPushButton, QHBoxLayout, QVBoxLayout,
     QGridLayout, QTableWidget, QTableWidgetItem, QTextEdit, QMessageBox,
-    QFileDialog, QGroupBox, QDoubleSpinBox, QComboBox,
+    QFileDialog, QGroupBox, QDoubleSpinBox, QComboBox, QLineEdit,
 )
 
 from gui.worker import WeighingWorker
 from gui.scan_worker import ScanWorker
 from communication.radwag_client import list_serial_ports
-from storage.csv_logger import CsvLogger
+from storage.excel_logger import ExcelLogger
 from parser.radwag_parser import MeasurementResult
 from config import (
-    DEFAULT_INTERVAL_S, CSV_DEFAULT_FILENAME, TIMESTAMP_FORMAT,
+    DEFAULT_INTERVAL_S, EXCEL_DEFAULT_FILENAME, TIMESTAMP_FORMAT,
     WINDOW_TITLE, TABLE_MAX_ROWS, LOG_MAX_LINES,
 )
 
@@ -61,8 +61,8 @@ class MainWindow(QWidget):
         # Stan aplikacji.
         self._worker = None       # WeighingWorker, None gdy nie rejestrujemy
         self._scan_worker = None  # ScanWorker, None gdy nie skanujemy
-        self._csv_logger = None   # CsvLogger, None gdy nie rejestrujemy
-        self._csv_path = CSV_DEFAULT_FILENAME
+        self._excel_logger = None # ExcelLogger, None gdy nie rejestrujemy
+        self._excel_path = EXCEL_DEFAULT_FILENAME
 
         # Budujemy interfejs.
         self._build_ui()
@@ -117,14 +117,15 @@ class MainWindow(QWidget):
         self.interval_input.setMaximumWidth(100)
         layout.addWidget(self.interval_input, 0, 5)
 
-        # Plik CSV — pole z aktualną ścieżką + przycisk wyboru.
-        layout.addWidget(QLabel("Plik CSV:"), 1, 0)
-        self.csv_path_label = QLabel(self._csv_path)
-        self.csv_path_label.setStyleSheet("color: #444; font-style: italic;")
-        layout.addWidget(self.csv_path_label, 1, 1, 1, 4)
-        self.choose_csv_btn = QPushButton("Wybierz...")
-        self.choose_csv_btn.clicked.connect(self._on_choose_csv)
-        layout.addWidget(self.choose_csv_btn, 1, 5)
+        # Plik Excel — edytowalne pole ze ścieżką + przycisk obok.
+        layout.addWidget(QLabel("Plik Excel:"), 1, 0)
+        self.excel_path_input = QLineEdit(self._excel_path)
+        self.excel_path_input.setPlaceholderText("Ścieżka do pliku .xlsx...")
+        layout.addWidget(self.excel_path_input, 1, 1, 1, 3)
+        self.choose_excel_btn = QPushButton("📂 Wybierz plik Excel")
+        self.choose_excel_btn.setToolTip("Kliknij, aby wybrać gdzie zapisywać pomiary")
+        self.choose_excel_btn.clicked.connect(self._on_choose_excel)
+        layout.addWidget(self.choose_excel_btn, 1, 4, 1, 2)
 
         # Przyciski Start / Stop.
         btn_row = QHBoxLayout()
@@ -312,23 +313,23 @@ class MainWindow(QWidget):
     # OBSŁUGA ZDARZEŃ GUI - REJESTRACJA
     # ===================================================================
 
-    def _on_choose_csv(self) -> None:
-        """Pozwala wybrać plik CSV, gdzie pójdą pomiary."""
+    def _on_choose_excel(self) -> None:
+        """Pozwala wybrać plik Excel, gdzie pójdą pomiary."""
         path, _ = QFileDialog.getSaveFileName(
             self,
-            "Wybierz plik CSV do zapisu pomiarów",
-            self._csv_path,
-            "CSV (*.csv);;Wszystkie pliki (*)",
+            "Wybierz plik Excel do zapisu pomiarów",
+            self._excel_path,
+            "Excel (*.xlsx);;Wszystkie pliki (*)",
         )
         if path:
-            if not path.lower().endswith(".csv"):
-                path += ".csv"
-            self._csv_path = path
-            self.csv_path_label.setText(path)
-            self._append_log(f"Plik CSV ustawiony na: {path}")
+            if not path.lower().endswith(".xlsx"):
+                path += ".xlsx"
+            self._excel_path = path
+            self.excel_path_input.setText(path)
+            self._append_log(f"Plik Excel ustawiony na: {path}")
 
     def _on_start(self) -> None:
-        """Klik przycisku Start: walidacja, otwarcie CSV, start wątku."""
+        """Klik przycisku Start: walidacja, otwarcie pliku Excel, start wątku."""
         # --- Walidacja danych z formularza ---
         port = self._get_selected_port()
         if not port or port.startswith("(brak"):
@@ -340,14 +341,26 @@ class MainWindow(QWidget):
             self._show_error("Interwał musi być większy od zera.")
             return
 
-        # --- Otwieramy plik CSV ---
+        # --- Potwierdzenie pliku docelowego ---
+        self._excel_path = self.excel_path_input.text().strip()
+        answer = QMessageBox.question(
+            self,
+            "Potwierdzenie pliku docelowego",
+            f"Pomiary zostaną zapisane do:\n\n  {self._excel_path}\n\n"
+            f"Czy plik docelowy jest ustawiony poprawnie?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if answer != QMessageBox.Yes:
+            return
+
+        # --- Otwieramy plik Excel ---
         try:
-            self._csv_logger = CsvLogger(self._csv_path)
-            self._csv_logger.open()
-            self._append_log(f"Plik CSV otwarty: {self._csv_path}")
+            self._excel_logger = ExcelLogger(self._excel_path)
+            self._excel_logger.open()
+            self._append_log(f"Plik Excel otwarty: {self._excel_path}")
         except OSError as e:
-            self._show_error(f"Nie mogę otworzyć pliku CSV: {e}")
-            self._csv_logger = None
+            self._show_error(f"Nie mogę otworzyć pliku Excel: {e}")
+            self._excel_logger = None
             return
 
         # --- Tworzymy i startujemy wątek ---
@@ -375,10 +388,10 @@ class MainWindow(QWidget):
 
     def _on_worker_finished(self) -> None:
         """Wątek się zakończył (sam albo na nasze życzenie). Sprzątamy."""
-        if self._csv_logger is not None:
-            self._csv_logger.close()
-            self._csv_logger = None
-            self._append_log("Plik CSV zamknięty.")
+        if self._excel_logger is not None:
+            self._excel_logger.close()
+            self._excel_logger = None
+            self._append_log("Plik Excel zamknięty.")
 
         self._worker = None
 
@@ -411,15 +424,12 @@ class MainWindow(QWidget):
         # 2. Tabela.
         self._add_row_to_table(result, timestamp)
 
-        # 3. CSV.
-        if self._csv_logger is not None:
+        # 3. Excel.
+        if self._excel_logger is not None:
             try:
-                self._csv_logger.write_row(
-                    timestamp, result.mass, result.unit,
-                    result.status, result.raw_response,
-                )
+                self._excel_logger.write_row(timestamp, result.mass, result.unit, result.status)
             except OSError as e:
-                self._append_log(f"BŁĄD zapisu CSV: {e}")
+                self._append_log(f"BŁĄD zapisu Excel: {e}")
 
     def _on_connection_lost(self, reason: str) -> None:
         """Wątek zgłosił że połączenie padło. Zatrzymujemy + alert."""
