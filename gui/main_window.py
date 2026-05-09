@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QPushButton, QHBoxLayout, QVBoxLayout,
     QGridLayout, QTableWidget, QTableWidgetItem, QTextEdit, QMessageBox,
     QFileDialog, QGroupBox, QDoubleSpinBox, QComboBox, QLineEdit,
+    QMenuBar,
 )
 
 from gui.worker import WeighingWorker
@@ -77,6 +78,12 @@ class MainWindow(QWidget):
     def _build_ui(self) -> None:
         """Składa cały layout okna."""
         root = QVBoxLayout(self)
+
+        menu_bar = QMenuBar(self)
+        help_menu = menu_bar.addMenu("Pomoc")
+        about_action = help_menu.addAction("O programie")
+        about_action.triggered.connect(self._show_about)
+        root.setMenuBar(menu_bar)
 
         root.addWidget(self._build_connection_group())
         root.addWidget(self._build_status_group())
@@ -405,7 +412,7 @@ class MainWindow(QWidget):
         self.refresh_btn.setEnabled(enabled)
         self.scan_btn.setEnabled(enabled)
         self.interval_input.setEnabled(enabled)
-        self.choose_csv_btn.setEnabled(enabled)
+        self.choose_excel_btn.setEnabled(enabled)
 
     # ===================================================================
     # SLOTY DLA SYGNAŁÓW Z WĄTKU REJESTRACJI
@@ -487,6 +494,16 @@ class MainWindow(QWidget):
     def _show_error(self, message: str) -> None:
         """Wyświetla popup z błędem."""
         QMessageBox.critical(self, "Błąd", message)
+
+    def _show_about(self) -> None:
+        QMessageBox.about(
+            self,
+            "O programie",
+            "<b>Radwag Rejestrator</b><br>"
+            "Wersja 1.0.0<br><br>"
+            "Autor: Michał Pańczyk<br>"
+            "Kontakt: <a href='mailto:nullSec.Pan@gmail.com'>nullSec.Pan@gmail.com</a>",
+        )
 
     # ===================================================================
     # ZAMYKANIE OKNA

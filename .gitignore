@@ -9,6 +9,10 @@ __pycache__/
 # CSV logi — generowane przez apkę, nie trzymamy w repo
 *.csv
 
+# Build / dist
+build/
+dist/
+
 # OS
 .DS_Store
 Thumbs.db
