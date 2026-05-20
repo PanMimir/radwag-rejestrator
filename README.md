@@ -4,6 +4,20 @@ Prosta aplikacja desktopowa w Pythonie do cyklicznego odczytu masy
 z wagi analitycznej RADWAG WLC X2 podłączonej przez **USB** (lub RS232)
 i zapisu do pliku CSV.
 
+## Pobieranie (gotowy .exe)
+
+Najprościej: pobierz gotowy `Radwag_Rejestrator.exe` z
+**[GitHub Releases](https://github.com/PanMimir/radwag-rejestrator/releases/latest)**
+i uruchom dwuklikiem. Nie wymaga instalacji Pythona ani żadnych zależności.
+
+- **Wymagania:** Windows 10 / 11 (64-bit)
+- Plik nie jest podpisany cyfrowo — jeśli pojawi się ekran **SmartScreen**,
+  kliknij „Więcej informacji" → „Uruchom mimo to".
+
+Sekcje poniżej (Wymagania, Instalacja, Uruchomienie) dotyczą uruchamiania
+aplikacji **ze źródeł** — potrzebne tylko jeśli chcesz rozwijać projekt
+lub zbudować własny `.exe`.
+
 ## Wymagania
 
 - Python 3.10+
