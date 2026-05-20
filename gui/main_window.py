@@ -500,9 +500,9 @@ class MainWindow(QWidget):
             self,
             "O programie",
             "<b>Radwag Rejestrator</b><br>"
-            "Wersja 1.0.0<br><br>"
-            "Autor: Michał Pańczyk<br>"
-            "Kontakt: <a href='mailto:nullSec.Pan@gmail.com'>nullSec.Pan@gmail.com</a>",
+            "Wersja 1.0.1<br><br>"
+            "Producent: <a href='https://sincore.io'>sincore.io</a><br>"
+            "Kontakt: <a href='mailto:contact@sincore.io'>contact@sincore.io</a>",
         )
 
     # ===================================================================
