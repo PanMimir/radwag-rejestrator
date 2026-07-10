@@ -74,7 +74,11 @@ SCAN_TIMEOUT_S = 1.0   # krótszy timeout dla skanu, żeby nie czekać wiecznie 
 # ZAPIS DANYCH
 # =====================================================================
 
-EXCEL_DEFAULT_FILENAME = "log_wagi.xlsx"
+# Wzorzec nazwy pliku Excel proponowanej przy starcie aplikacji.
+# strftime: %d.%m.%y = dzień.miesiąc.rok(2 cyfry), np. "10.07.26_Pomiar_wagi".
+# Uwaga: w nazwie pliku nie może być ukośników (DD/MM/YY), Windows ich zabrania,
+# dlatego separator daty to kropka.
+EXCEL_FILENAME_PATTERN = "%d.%m.%y_Pomiar_wagi"
 
 # Format znacznika czasu zapisywanego w CSV i pokazywanego w GUI.
 TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"

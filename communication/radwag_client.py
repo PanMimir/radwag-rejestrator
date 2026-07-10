@@ -137,6 +137,13 @@ class RadwagClient:
             raise RadwagConnectionError("Port nieotwarty — wywołaj connect() najpierw.")
 
         try:
+            # Zanim wyślemy zapytanie, wyrzucamy z bufora wejściowego wszystko
+            # co mogło tam zostać z poprzednich cykli (spóźniona odpowiedź,
+            # niedoczytany ogon ramki). Bez tego czytalibyśmy STARE bajty jako
+            # odpowiedź na NOWĄ komendę i ramki by się rozjeżdżały — parser
+            # zgłaszałby wtedy cykliczne błędy mimo sprawnej wagi.
+            self._serial.reset_input_buffer()
+
             # Wyślij komendę. write() sam pilnuje że poszło wszystko.
             self._serial.write(command)
             # flush() to dla pewności — niektóre konwertery USB→Serial buforują

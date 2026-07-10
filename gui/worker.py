@@ -121,6 +121,19 @@ class WeighingWorker(QThread):
                     raw = self._client.send_and_receive(RADWAG_WEIGHT_COMMAND)
                     timestamp = datetime.now()  # czas LOKALNY komputera
                     result = self._parser.parse(raw)
+
+                    # Uszkodzona ramka? Jedna szybka ponowna próba w tym samym
+                    # cyklu — żeby chwilowy zgrzyt transmisji nie robił dziury
+                    # w danych na cały interwał.
+                    if result.status == "ERROR" and not self._stop_requested:
+                        self.log_message.emit(
+                            f"Błędna ramka z wagi ({raw!r}) — ponawiam odczyt..."
+                        )
+                        time.sleep(0.3)
+                        raw = self._client.send_and_receive(RADWAG_WEIGHT_COMMAND)
+                        timestamp = datetime.now()
+                        result = self._parser.parse(raw)
+
                     self.measurement_ready.emit(result, timestamp)
                 except RadwagConnectionError as e:
                     # Decyzja użytkownika: przy rozłączeniu STOP + alert.

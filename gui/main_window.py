@@ -19,6 +19,8 @@ Layout (w przybliżeniu):
     +----------------------------------------------------------+
 """
 
+import os
+import re
 from datetime import datetime
 
 from PySide6.QtCore import Qt
@@ -36,9 +38,46 @@ from communication.radwag_client import list_serial_ports
 from storage.excel_logger import ExcelLogger
 from parser.radwag_parser import MeasurementResult
 from config import (
-    DEFAULT_INTERVAL_S, EXCEL_DEFAULT_FILENAME, TIMESTAMP_FORMAT,
+    DEFAULT_INTERVAL_S, EXCEL_FILENAME_PATTERN, TIMESTAMP_FORMAT,
     WINDOW_TITLE, TABLE_MAX_ROWS, LOG_MAX_LINES,
 )
+
+
+# Rozpoznawanie plików nazwanych automatycznie (dowolna data i numer):
+# "10.07.26_Pomiar_wagi_0001.xlsx". Dzięki temu odróżniamy nazwę wygenerowaną
+# przez aplikację od nazwy wpisanej ręcznie przez użytkownika.
+_AUTO_NAME_RE = re.compile(r"^\d{2}\.\d{2}\.\d{2}_Pomiar_wagi_\d{4}\.xlsx$", re.IGNORECASE)
+
+
+def _default_excel_dir() -> str:
+    """Domyślny katalog na pliki pomiarów: Pulpit, a gdy go nie ma — katalog domowy."""
+    desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+    return desktop if os.path.isdir(desktop) else os.path.expanduser("~")
+
+
+def _next_excel_path(directory: str) -> str:
+    """Kolejna wolna ścieżka pliku pomiarów dla DZISIEJSZEGO dnia w danym katalogu.
+
+    Format nazwy: DD.MM.RR_Pomiar_wagi_NNNN.xlsx, np. 10.07.26_Pomiar_wagi_0003.xlsx.
+    Numeracja 0001–9999 liczona osobno dla każdego dnia — nowy dzień ma nową
+    datę w nazwie, więc licznik naturalnie startuje od 0001.
+
+    Numer wyznaczamy skanując istniejące pliki w katalogu (najwyższy + 1),
+    dzięki czemu numeracja trzyma się kupy także po restarcie aplikacji.
+    """
+    prefix = datetime.now().strftime(EXCEL_FILENAME_PATTERN) + "_"
+    highest = 0
+    try:
+        for name in os.listdir(directory):
+            if name.startswith(prefix) and name.lower().endswith(".xlsx"):
+                num_part = name[len(prefix):-len(".xlsx")]
+                if num_part.isdigit():
+                    highest = max(highest, int(num_part))
+    except OSError:
+        pass  # katalog nie istnieje albo brak dostępu — zaczynamy od 0001
+
+    number = min(highest + 1, 9999)
+    return os.path.join(directory, f"{prefix}{number:04d}.xlsx")
 
 
 # Kolory tła wiersza w tabeli wg statusu pomiaru.
@@ -63,7 +102,7 @@ class MainWindow(QWidget):
         self._worker = None       # WeighingWorker, None gdy nie rejestrujemy
         self._scan_worker = None  # ScanWorker, None gdy nie skanujemy
         self._excel_logger = None # ExcelLogger, None gdy nie rejestrujemy
-        self._excel_path = EXCEL_DEFAULT_FILENAME
+        self._excel_path = _next_excel_path(_default_excel_dir())
 
         # Budujemy interfejs.
         self._build_ui()
@@ -348,17 +387,23 @@ class MainWindow(QWidget):
             self._show_error("Interwał musi być większy od zera.")
             return
 
-        # --- Potwierdzenie pliku docelowego ---
-        self._excel_path = self.excel_path_input.text().strip()
-        answer = QMessageBox.question(
-            self,
-            "Potwierdzenie pliku docelowego",
-            f"Pomiary zostaną zapisane do:\n\n  {self._excel_path}\n\n"
-            f"Czy plik docelowy jest ustawiony poprawnie?",
-            QMessageBox.Yes | QMessageBox.No,
-        )
-        if answer != QMessageBox.Yes:
-            return
+        # --- Plik docelowy: bez pytań, start = utworzenie NOWEGO pliku ---
+        # Każda sesja rejestracji (np. kolejna próbka) dostaje własny plik
+        # z kolejnym numerem w ramach dnia. Katalog bierzemy z pola —
+        # użytkownik mógł go zmienić. Nazwę generujemy na nowo, CHYBA ŻE
+        # użytkownik wpisał własną, niestandardową — wtedy jej nie ruszamy.
+        path = self.excel_path_input.text().strip()
+        directory, filename = os.path.split(path)
+        if not directory:
+            directory = _default_excel_dir()
+        if not filename or _AUTO_NAME_RE.match(filename):
+            path = _next_excel_path(directory)
+        else:
+            if not filename.lower().endswith(".xlsx"):
+                filename += ".xlsx"
+            path = os.path.join(directory, filename)
+        self._excel_path = path
+        self.excel_path_input.setText(path)
 
         # --- Otwieramy plik Excel ---
         try:
@@ -431,7 +476,15 @@ class MainWindow(QWidget):
         # 2. Tabela.
         self._add_row_to_table(result, timestamp)
 
-        # 3. Excel.
+        # 3. Excel — do pliku trafiają TYLKO poprawne odczyty.
+        # Wiersze ERROR (albo bez masy) psuły klientce analizę czasową danych,
+        # więc zostają wyłącznie w tabeli GUI i logach.
+        if result.status == "ERROR" or result.mass is None:
+            self._append_log(
+                f"Odczyt {result.status} bez poprawnej masy — pominięty w pliku Excel."
+            )
+            return
+
         if self._excel_logger is not None:
             try:
                 self._excel_logger.write_row(timestamp, result.mass, result.unit, result.status)
@@ -500,7 +553,7 @@ class MainWindow(QWidget):
             self,
             "O programie",
             "<b>Radwag Rejestrator</b><br>"
-            "Wersja 1.0.1<br><br>"
+            "Wersja 1.1.0<br><br>"
             "Producent: <a href='https://sincore.io'>sincore.io</a><br>"
             "Kontakt: <a href='mailto:contact@sincore.io'>contact@sincore.io</a>",
         )
